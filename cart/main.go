@@ -78,7 +78,7 @@ func Checkout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	order_id := uuid.New()
-	event := kafka_event{PID: product_id, UserID: user_id, OrderID: order_id, Status: "progressing"}
+	event := kafka_event{PID: product_id, UserID: user_id, OrderID: order_id, Status: "progressing", Date_Created: time.Now().Format("20060102150405")}
 	event_resp, _ := json.Marshal(event)
 	InitializeOrder(order_id)
 	utils.PublishKafkaEvent(string(event_resp))
@@ -138,7 +138,7 @@ func IncreaseReserved(pid string) error {
 }
 
 func InitializeOrder(order_id uuid.UUID) {
-	set, err := order_status_client.Set(order_id, "progressing").Result()
+	set, err := order_status_client.Set(order_id, "progressing", 120*time.Second).Result() //setting expiry
 	if err != nil {
 		log.Printf("error initializing order: %s\n", pid)
 		return err

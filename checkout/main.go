@@ -113,15 +113,15 @@ func ReduceReserved(pid string) error {
 	return nil
 }
 
-func UpdateOrder(order_id uuid.UUID, status string) error {
-	set, err := order_status_client.Set(order_id, status).Result()
-	if err != nil {
-		log.Printf("error updating status order: %s\n", pid)
-		return err
+func UpdateOrder(order_id uuid.UUID, status string) {
+	ttl, err := order_status_client.TTL(order_id, status).Result()
+	if ttl < 0 || err != nil {
+		log.Printf("error updating status order: %s, ttl: %v\n", order_id, ttl)
 	} else {
 		log.Printf("order: %v updated,status: %v", order_id, status)
 	}
-	return nil
+
+	order_status_client.Set(order_id, status).Result()
 }
 
 func RemoveOrder(product_id string, order_id uuid.UUID) error {
@@ -176,7 +176,8 @@ func AssignOrders(product_id string) {
 
 func CheckAndUpdateStatus(product_id string, orders, status []string) {
 	for index, order_id := range orders {
-		if status[index] == "cancelled" || status[index] == "failed" {
+		// timeout, cancelled, payment failed
+		if status[index] == "" || status[index] == "cancelled" || status[index] == "failed" {
 			RemoveOrder(product_id, order_id)
 			IncreaseAvailability(product_id)
 			ReduceReserved(product_id)
